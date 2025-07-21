@@ -16,7 +16,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from automl.dummy_model import DummyNN
+from automl.dummy_model import DummyNN, CNN
 from automl.utils import calculate_mean_std
 
 
@@ -64,7 +64,8 @@ class AutoML:
 
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
-        model = DummyNN(input_size, dataset_class.num_classes)
+        #model = DummyNN(input_size, dataset_class.num_classes)
+        model = CNN(dataset_class.channels, dataset_class.num_classes)
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=0.003)
         
