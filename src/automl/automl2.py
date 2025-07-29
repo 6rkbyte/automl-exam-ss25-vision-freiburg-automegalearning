@@ -38,6 +38,7 @@ class AutoML:
         self,
         dataset_class: Any,
         augments,
+        epochs=5,
     ) -> AutoML:
         """A reference/toy implementation of a fitting function for the AutoML class.
         """
@@ -74,7 +75,7 @@ class AutoML:
         #self._transform = full_res_transform if fullres else transform
         self._transform = transforms.Compose(transform_list)
 		#!/ size
-        epochs = 10 #!
+        #epochs = 10 #!
         dataset = dataset_class(
             root="./data",
             split='train',
