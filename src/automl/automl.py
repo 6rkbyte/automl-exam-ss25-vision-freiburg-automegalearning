@@ -60,7 +60,7 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
 
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
