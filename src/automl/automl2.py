@@ -14,7 +14,7 @@ import logging
 
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from torchvision import transforms #!
+# from torchvision import transforms #!
 
 #from automl.dummy_model import DummyNN, CNN
 from automl.utils import calculate_mean_std
@@ -59,21 +59,47 @@ class AutoML:
         if (horflip := augments['horflip']) != 0:
             transform_list.append(transforms.RandomHorizontalFlip(horflip))
         if (blurstddev := augments['blur']) != 0:
-            transform_list.append(transforms.GaussianBlur(kernel_size=(3,3), sigma=blurstddev))
+            # transform_list.append(transforms.GaussianBlur(kernel_size=(3,3), sigma=blurstddev))
+            transform_list.append(transforms.GaussianBlur(kernel_size=(3,3), sigma=(0.1, blurstddev)))
+        transform_list += [transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)]
+        if (noisestddev := augments['noise']) != 0:
+            # transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
+            transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
         transform_list += [
             #transforms.ToTensor(),
-            transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True), # <=> ToTensor()
+            #transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True), # <=> ToTensor()
             transforms.Normalize(*calculate_mean_std(dataset_class)),
 		]
+        
+        # transform_list = []
+        # if (rot := augments['rot']) != 0:
+        #     transform_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BICUBIC))
+        # if (horflip := augments['horflip']) != 0:
+        #     transform_list.append(transforms.RandomHorizontalFlip(horflip))
+        # if (blurstddev := augments['blur']) != 0:
+        #     # transform_list.append(transforms.GaussianBlur(kernel_size=(3,3), sigma=blurstddev))
+        #     transform_list.append(transforms.GaussianBlur(kernel_size=(3,3), sigma=(0.1, blurstddev)))
+        # # if (noisestddev := augments['noise']) != 0:
+        # #     # transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
+        # #     transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
+        # transform_list = [transforms.RandomChoice(transform_list)]
+        # transform_list += [
+        #     #transforms.ToTensor(),
+        #     transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True), # <=> ToTensor()
+        #     transforms.Normalize(*calculate_mean_std(dataset_class)),
+		# ]
+        
         #!  size
-        res = 0 # 0 (fullres), 84, 112, 224
-        #res = 10
+        #res = 0 # 0 (fullres), 84, 112, 224
+        #res = 56
+        res = min(dataset_class.width, 56) #!
         res = (res, res) if isinstance(res, int) else res
         fullres = (res[0] == 0)
         if not fullres:
             transform_list = [transforms.Resize(res, interpolation=transforms.InterpolationMode.BICUBIC)] + transform_list
+        transform = transforms.Compose(transform_list)
         #self._transform = full_res_transform if fullres else transform
-        self._transform = transforms.Compose(transform_list)
+        self._transform = transform
 		#!/ size
         #epochs = 10 #!
         dataset = dataset_class(
@@ -89,7 +115,7 @@ class AutoML:
         print(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size
         transform_str = 'transforms:\n'
         
-        for t in transform_list[:-3]:
+        for t in transform_list:#[:-3]:
             transform_str += f'- {t}\n'
         print(transform_str)
 
