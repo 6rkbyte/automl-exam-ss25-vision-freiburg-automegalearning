@@ -98,7 +98,8 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True, num_workers=4)
+        #train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True, num_workers=4)
+        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True, num_workers=0)
         size = (dataset_class.width, dataset_class.height) if fullres else res #! size
         logger.info(f'epochs: {epochs}') #! size
         logger.info(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size
