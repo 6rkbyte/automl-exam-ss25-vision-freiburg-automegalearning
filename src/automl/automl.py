@@ -90,7 +90,7 @@ class AutoML:
                 optimizer.step()
                 loss_per_batch.append(loss.item())
 
-                predicted = predicted.to('cpu')
+                predicted = output.to('cpu')
                 target = target.to('cpu')
                 
                 predictions.append(predicted.numpy()) #! accuracy
