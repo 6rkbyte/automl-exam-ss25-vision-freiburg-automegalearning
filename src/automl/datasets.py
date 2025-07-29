@@ -87,7 +87,7 @@ class BaseVisionDataset(VisionDataset):
     def download(self) -> None:
         """Download and extract the zip file containing all datasets into root directory."""
         if self._check_integrity():
-            print("Dataset already downloaded and verified.")
+            # print("Dataset already downloaded and verified.")
             return
 
         # Extract to temporary location
