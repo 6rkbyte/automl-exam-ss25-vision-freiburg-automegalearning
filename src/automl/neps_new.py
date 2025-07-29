@@ -43,7 +43,7 @@ def run_neps(evaluate_pipeline, pipeline_space, root_dir='./temp_neps'):
 		evaluate_pipeline=evaluate_pipeline,
 		pipeline_space = pipeline_space,
 		root_directory=root_dir,
-		max_evaluations_total=10,
+		max_evaluations_total=20,
         #overwrite_working_directory=True,
 	)
 
@@ -69,9 +69,9 @@ pipeline_space = dict(
 	# )#TODO add tanh, etc.
 	#dataset_class=datasets.EmotionsDataset, #!
 )
-import logging
+import logging, sys #!
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 #logging.basicConfig(level=logging.INFO)
 
 run_neps(evaluate_pipeline=evaluate_pipeline, pipeline_space=pipeline_space)
