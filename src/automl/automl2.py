@@ -39,17 +39,18 @@ class AutoML:
         dataset_class: Any,
         augments,
         epochs=5,
+        RESIZE_SIZE=0
     ) -> AutoML:
         """A reference/toy implementation of a fitting function for the AutoML class.
         """
         # set seed for pytorch training
         random.seed(self.seed)
         np.random.seed(self.seed)
-        torch.manual_seed(self.seed)
+        torch.manual_seed(self.seed) #TODO should this be removed? should I just remove the hardcoded seed=42?
         torch.cuda.manual_seed(self.seed)
 
         # Ensure deterministic behavior in CuDNN
-        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.deterministic = True #TODO should this be removed?
         torch.backends.cudnn.benchmark = False
 
         print(augments)
@@ -92,7 +93,7 @@ class AutoML:
         #!  size
         #res = 0 # 0 (fullres), 84, 112, 224
         #res = 56
-        res = min(dataset_class.width, 56) #!
+        res = min(dataset_class.width, RESIZE_SIZE) #!
         res = (res, res) if isinstance(res, int) else res
         fullres = (res[0] == 0)
         if not fullres:
@@ -108,8 +109,8 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        #train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True)
+        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+        #train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True)
         size = (dataset_class.width, dataset_class.height) if fullres else res #! size
         print('epochs: {epochs}') #! size
         print(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size

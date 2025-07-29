@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 import os
-import time
+from time import time
 import pandas as pd
 import logging
 import numpy as np
@@ -25,7 +25,8 @@ def objective(trial: optuna.Trial):
     automl = AutoML(42) #TODO fix seed thing
     
     augments = dict(rot=rot, horflip=horflip, blur=blur, noise=noise)
-    automl.fit(dataset_class, augments, epochs=epochs)
+	#!
+    automl.fit(dataset_class, augments, epochs=epochs, RESIZE_SIZE=resize)
     preds, labels = automl.predict(dataset_class)
     if not np.isnan(labels).any(): #TODO remove
         acc = accuracy_score(labels, preds)
@@ -93,6 +94,13 @@ parser.add_argument(
 	default=5,
 	help="Number of epochs per trial.",
 )
+	
+parser.add_argument(
+	"--resize",
+	type=int,
+	default=0,
+	help="Resize image width/height to this value. If the images are smaller, this argument is ignored.",
+)
 
 args = parser.parse_args()
 
@@ -100,6 +108,7 @@ args = parser.parse_args()
 dataset = args.dataset
 trials = args.trials #!#TODO TEMPORARY
 epochs = args.epochs #!#TODO TEMPORARY
+resize = args.resize
 
 match dataset:
 	case "fashion":
@@ -112,12 +121,32 @@ match dataset:
 		raise ValueError(f"Invalid dataset: {dataset}")
 
 
-study = optuna.create_study(direction='maximize', study_name=f'{dataset}, trials={trials}, epochs={epochs}')
+size = min(dataset_class.width, resize)
+study_name = f'{dataset} ({size}x{size}), trials={trials}, epochs={epochs}'
+study = optuna.create_study(direction='maximize', study_name=study_name)
+
+t_before_study = time()
 study.optimize(func=objective, n_trials=trials)
+t_after_study = time()
+timediff = t_after_study - t_before_study
+duration_str = f'{timediff // 60:.0f}m{timediff % 60:.3f}s'
+
+best = study.best_trial
+
+output_str = f'{study_name}\n\n- study duration: {duration_str}\n\n'
+output_str += f'-------- best --------\n\n\ntrial: {best.number}\n- {best.params}\naccuracy: {best.value}\n\n\n'
+output_str += f'------- trials -------\n\n\n'
 
 trials = study.get_trials()
 for i in range(len(trials)):
 	t = trials[i]
-	print(f'trial {i}:\n- {t.params}\n- {t.value}\n')
+	#print(f'trial {i}:\n- {t.params}\n- {t.value}\n')
+	output_str += f'trial {i}:\n- {t.params}\n- accuracy: {t.value}\n\n'
 
-print(f'best params: {study.best_params}')
+#print(f'best params: {best.params}\naccuracy: best.value')
+#output_str += f'----- best -----\ntrial: {best.number}\n{best.params}\naccuracy: {best.value}\nstudy duration: {duration_str}'
+print(output_str)
+
+
+with open(f'optuna_res/{study_name}.txt', mode = 'w') as f:
+    f.write(output_str[:-1])
