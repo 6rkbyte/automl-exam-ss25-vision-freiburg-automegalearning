@@ -39,7 +39,6 @@ class AutoML:
         """A reference/toy implementation of a fitting function for the AutoML class.
         """
         # set seed for pytorch training
-        logging.basicConfig(level=logging.INFO)
 	    
         random.seed(self.seed)
         np.random.seed(self.seed)
@@ -102,12 +101,14 @@ class AutoML:
             labels = np.concatenate(labels)
             
             t12 = time()
-            logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {t12 - t11}")
+            #logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {t12 - t11}")
+            print(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {t12 - t11}")
 			#!  accuracy & time
             from sklearn.metrics import accuracy_score
             if not np.isnan(labels).any():
                 acc = accuracy_score(labels, predictions)
-                logger.info(f"Accuracy on train set: {acc}\n")
+                #logger.info(f"Accuracy on train set: {acc}\n")
+                print(f"Accuracy on train set: {acc}\n")
                 labels, predictions = [], []
             #!/ accuracy & time
         model.eval()
