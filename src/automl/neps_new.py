@@ -22,13 +22,13 @@ def evaluate_pipeline(**config):
     #dataset_class = config.pop('dataset_class')
     # dataset_class = datasets.EmotionsDataset
     # dataset_class = datasets.FlowersDataset
-    dataset_class = datasets.FashionDataset
+    # dataset_class = datasets.FashionDataset
     print(f'\n{dataset_class._dataset_name}')
     automl = AutoML(42) #TODO fix seed thing
     
     augments = dict(rot=rot, horflip=horflip, blur=blur)
     # augments = dict(rot=rot, horflip=horflip)
-    automl.fit(dataset_class, augments)
+    automl.fit(dataset_class, augments, epochs=epochs)
     preds, labels = automl.predict(dataset_class)
     if not np.isnan(labels).any():
         acc = accuracy_score(labels, preds)
@@ -45,7 +45,7 @@ def run_neps(evaluate_pipeline, pipeline_space, root_dir='./temp_neps'):
 		pipeline_space = pipeline_space,
 		root_directory=root_dir,
 		max_evaluations_total=20,
-        #overwrite_working_directory=True,
+        overwrite_working_directory=True,
 	)
 
 
@@ -74,5 +74,48 @@ import logging, sys #!
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout) #!
 #logging.basicConfig(level=logging.INFO)
+
+
+parser = argparse.ArgumentParser()
+	
+parser.add_argument(
+	"--dataset",
+	type=str,
+	required=True,
+	help="The name of the dataset to run on.",
+	choices=["fashion", "flowers", "emotions"]
+)
+	
+parser.add_argument(
+	"--trials",
+	type=int,
+	default=10,
+	help="Number of NePS trials.",
+)
+	
+parser.add_argument(
+	"--epochs",
+	type=int,
+	default=5,
+	help="Number of epochs per trial.",
+)
+
+args = parser.parse_args()
+
+from datasets import FashionDataset, FlowersDataset, EmotionsDataset
+
+dataset = args.dataset
+trials = args.trials
+epochs = args.epochs
+
+match dataset:
+	case "fashion":
+		dataset_class = FashionDataset
+	case "flowers":
+		dataset_class = FlowersDataset
+	case "emotions":
+		dataset_class = EmotionsDataset
+	case _: #TODO allow new datasets
+		raise ValueError(f"Invalid dataset: {dataset}")
 
 run_neps(evaluate_pipeline=evaluate_pipeline, pipeline_space=pipeline_space)
