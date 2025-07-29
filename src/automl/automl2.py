@@ -82,7 +82,8 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+        #train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True)
         size = (dataset_class.width, dataset_class.height) if fullres else res #! size
         print('epochs: {epochs}') #! size
         print(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size
