@@ -14,7 +14,7 @@ import numpy as np
 from automl.automl_old import AutoML
 import argparse
 
-import logging
+import logging, sys
 
 from automl.datasets import FashionDataset, FlowersDataset, EmotionsDataset
 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.quiet:
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
     else:
         logging.basicConfig(level=logging.WARNING)
 
