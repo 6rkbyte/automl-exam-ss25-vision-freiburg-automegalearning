@@ -32,7 +32,8 @@ def evaluate_pipeline(**config):
     preds, labels = automl.predict(dataset_class)
     if not np.isnan(labels).any():
         acc = accuracy_score(labels, preds)
-        logger.info(f"Accuracy on test set: {acc}")
+        # logger.info(f"Accuracy on test set: {acc}")
+        print(f"Accuracy on test set: {acc}") #!
 
     return {'loss': -acc, 'objective_to_minimize': -acc}
 
@@ -71,7 +72,7 @@ pipeline_space = dict(
 )
 import logging, sys #!
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout) #!
 #logging.basicConfig(level=logging.INFO)
 
 run_neps(evaluate_pipeline=evaluate_pipeline, pipeline_space=pipeline_space)
