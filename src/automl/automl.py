@@ -39,6 +39,8 @@ class AutoML:
         """A reference/toy implementation of a fitting function for the AutoML class.
         """
         # set seed for pytorch training
+        logging.basicConfig(level=logging.INFO)
+	    
         random.seed(self.seed)
         np.random.seed(self.seed)
         torch.manual_seed(self.seed)
@@ -133,6 +135,9 @@ class AutoML:
         
         with torch.no_grad():
             for data, target in data_loader:
+                data = data.to(device)
+                target = target.to(device)
+		    
                 output = self._model(data)
                 predicted = torch.argmax(output, 1)
                 
