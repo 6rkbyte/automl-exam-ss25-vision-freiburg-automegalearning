@@ -90,7 +90,8 @@ class AutoML:
                 optimizer.step()
                 loss_per_batch.append(loss.item())
 
-                predicted = output.to('cpu')
+                predicted = torch.argmax(output, 1)   #! accuracy
+                predicted = predicted.to('cpu')
                 target = target.to('cpu')
                 
                 predictions.append(predicted.numpy()) #! accuracy
