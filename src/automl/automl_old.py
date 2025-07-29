@@ -101,13 +101,16 @@ class AutoML:
         #train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True, num_workers=4)
         train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True, num_workers=0)
         size = (dataset_class.width, dataset_class.height) if fullres else res #! size
-        logger.info(f'epochs: {epochs}') #! size
-        logger.info(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size
+        # logger.info(f'epochs: {epochs}') #! size
+        # logger.info(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size
+        print(f'epochs: {epochs}') #! size
+        print(f'size: {size[0]}x{size[1]} (fullsize: {fullres})') #! size
         transform_str = 'transforms:\n'
         
         for t in transform_list[:-2]:
             transform_str += f'- {t}\n'
-        logger.info(transform_str)
+        # logger.info(transform_str)
+        print(transform_str)
 
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
@@ -160,19 +163,22 @@ class AutoML:
             labels = np.concatenate(labels)
             time_after_epoch = time() #! time
             timediff = time_after_epoch - time_before_epoch
-            logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {timediff // 60:.0f}m{timediff % 60:.3f}s")
+            # logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {timediff // 60:.0f}m{timediff % 60:.3f}s")
+            print(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {timediff // 60:.0f}m{timediff % 60:.3f}s")
             
 			#!  accuracy & time
             from sklearn.metrics import accuracy_score
             if not np.isnan(labels).any():
                 acc = accuracy_score(labels, predictions)
-                logger.info(f"Accuracy on train set: {acc}\n")
+                # logger.info(f"Accuracy on train set: {acc}\n")
+                print(f"Accuracy on train set: {acc}\n")
                 labels, predictions = [], []
             #!/ accuracy & time
         #!  time
         time_after_fit = time()
         timediff = time_after_fit - time_before_fit
-        logger.info(f"{timediff // 60:.0f}m{timediff % 60:.3f}s")
+        # logger.info(f"{timediff // 60:.0f}m{timediff % 60:.3f}s")
+        print(f"{timediff // 60:.0f}m{timediff % 60:.3f}s")
         #!/ time
             
         model.eval()
