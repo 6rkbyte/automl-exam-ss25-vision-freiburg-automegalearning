@@ -15,6 +15,7 @@ from automl.automl import AutoML
 import argparse
 from torch.utils.data import DataLoader
 from torchvision import transforms
+import torch
 
 import logging
 
@@ -52,7 +53,7 @@ def main(
 
     # Reuse same transforms
     transform = transforms.Compose([
-        transforms.Resize((64, 64)),
+        transforms.Resize(256),
         transforms.Grayscale(num_output_channels=3),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -140,6 +141,11 @@ if __name__ == "__main__":
     results_dir = Path("results")
     results_dir.mkdir(exist_ok=True)
     full_path = results_dir / args.path
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(torch.__version__)
+    print(torch.cuda.is_available())
+    print(torch.cuda.device_count())
+    print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
     main(
         dataset=args.dataset,
         output_path=args.output_path,

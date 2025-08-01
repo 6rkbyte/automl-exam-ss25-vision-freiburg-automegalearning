@@ -27,7 +27,7 @@ from optuna.pruners import HyperbandPruner
 
 
 #logger = logging.getLogger(__name__)
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AutoML:
 
@@ -41,6 +41,7 @@ class AutoML:
         self._model: nn.Module | None = None
         self.best_params_: dict = {}
     def tune(self, dataset_class, train_loader, val_loader, n_trials=30, timeout=None):
+        print(f"Using device: {device}")
         def objective(trial):
             # Sample hyperparameters
             lr = trial.suggest_float("lr", 5e-5, 1e-3, log=True)
@@ -57,15 +58,16 @@ class AutoML:
                 params[f"n_units_l{i}"] = trial.suggest_int(f"n_units_l{i}", 32, 600)
                 params[f"dropout_l{i}"] = trial.suggest_float(f"dropout_l{i}", 0.0, 0.4)
 
-            model = CNN_flex(in_channels=3, num_classes=dataset_class.num_classes, params=params)
+            model = CNN_flex(in_channels=3, num_classes=dataset_class.num_classes, params=params).to(device)
             #optimizer_class = getattr(torch.optim, optimizer_name)
             #optimizer = optimizer_class(model.parameters(), lr=lr)
-            optimizer = optim.Adam(model.parameters(), lr=lr)
+            optimizer = optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
             criterion = nn.CrossEntropyLoss()
 
             for epoch in range(5):  # Fast tuning
                 model.train()
                 for data, target in train_loader:
+                    data, target = data.to(device), target.to(device)
                     optimizer.zero_grad()
                     output = model(data)
                     loss = criterion(output, target)
@@ -77,10 +79,11 @@ class AutoML:
                 preds, targets = [], []
                 with torch.no_grad():
                     for data, target in val_loader:
+                        data, target = data.to(device), target.to(device)
                         output = model(data)
                         pred = output.argmax(1)
-                        preds.append(pred.numpy())
-                        targets.append(target.numpy())
+                        preds.append(pred.cpu().numpy())
+                        targets.append(target.cpu().numpy())
 
                 preds = np.concatenate(preds)
                 targets = np.concatenate(targets)
