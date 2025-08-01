@@ -50,25 +50,30 @@ def main(
     # Initialize AutoML
     automl = AutoML(seed=seed, networkType=networkType)
 
-    # Reuse same transforms
-    transform = transforms.Compose([
-        transforms.Resize((64, 64)),
-        transforms.Grayscale(num_output_channels=3),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                            std=[0.229, 0.224, 0.225])
-    ])
-    # Dataset
-    train_dataset = dataset_class(root="./data", split='train', download=True, transform=transform)
-    val_dataset = dataset_class(root="./data", split='test', download=True, transform=transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
-    # ✅ 1. Tune the model first
-    best_params = automl.tune(dataset_class=dataset_class,train_loader=train_loader,val_loader =val_loader, n_trials=100)
-    print("Best hyperparameters found:", best_params)
+    # ✅ 2. Then train the final model with best hyperparams
+    automl.fit(dataset_class=dataset_class, epochs=10, path=path)
 
-    
+    # ✅ 3. Predict on test data
+    preds, labels = automl.predict(dataset_class)
+
+    # Write the predictions of X_test to disk
+    # This will be used by github classrooms to get a performance
+    # on the test set.
+    #logger.info("Writing predictions to disk")
+    #with output_path.open("wb") as f:
+    #    np.save(f, test_preds)
+
+    # check if test_labels has missing data
+
+
+    #if not np.isnan(test_labels).any():
+    #    acc = accuracy_score(test_labels, test_preds)
+    #    logger.info(f"Accuracy on test set: {acc}")
+    #else:
+        # This is the setting for the exam dataset, you will not have access to the labels
+    #    logger.info(f"No test split for dataset '{dataset}'")
+
 
 
 if __name__ == "__main__":

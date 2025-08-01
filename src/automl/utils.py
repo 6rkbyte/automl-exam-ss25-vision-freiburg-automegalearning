@@ -3,6 +3,8 @@ from typing import Any
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+import csv
+
 
 def calculate_mean_std(dataset_class: Any):
     """Calculate the mean and standard deviation of the entire image dataset."""
@@ -29,3 +31,16 @@ def calculate_mean_std(dataset_class: Any):
     std /= total_images_count
 
     return mean, std
+
+
+def init_log_file(filepath, headers):
+    """Create a new CSV log file with column headers."""
+    with open(filepath, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+
+def log_epoch_results(filepath, values):
+    """Append a row of values (e.g., one epoch's results) to the CSV log file."""
+    with open(filepath, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(values)

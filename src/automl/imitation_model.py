@@ -1,0 +1,159 @@
+import torch.nn as nn
+import torch
+import torch.nn.functional as F
+
+"""
+Imitation learning network
+"""
+
+def imginfo(array):
+    print(type(array))
+    print(array.dtype, array.shape)
+
+
+class ResidualConvBlock(nn.Module):
+    def __init__(
+        self, in_channels: int, out_channels: int, is_res: bool = False
+    ) -> None:
+        super().__init__()
+        '''
+        TODO:
+        Implement a standard ResNet-style convolutional block.
+
+        Args:
+            in_channels (int): Number of channels in the input feature map.
+            out_channels (int): Number of channels produced by the block (also number of channels after 1st Conv2D layer).
+            is_res (bool): Whether to include a residual connection.
+
+        - Use two Conv2D layers with:
+            - kernel size = 3
+            - stride = 1
+            - padding = 1
+        - Each followed by BatchNorm and GELU activation.
+        - Track if in_channels == out_channels (used for skip connection logic).
+        '''
+        self.same_channels = (in_channels == out_channels)
+        self.is_res = is_res
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.GELU()
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.GELU()
+        )
+
+        # Hint: you may want to store:
+        # self.same_channels
+        # self.is_res
+        # self.conv1 = nn.Sequential(...)
+        # self.conv2 = nn.Sequential(...)
+
+        #raise NotImplementedError("Define conv1, conv2, same_channels, and is_res here")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.is_res:
+            x1 = self.conv1(x)
+            x2 = self.conv2(x1)
+            if self.same_channels:
+                out = x + x2
+            else:
+                out = x1 + x2 
+            return out
+        else:
+            x1 = self.conv1(x)
+            x2 = self.conv2(x1)
+            return x2
+
+class PointConv(nn.Module):
+    def __init__(
+        self, in_channels: int, out_channels: int, is_res: bool = False
+    ) -> None:
+        super().__init__()
+        '''
+        TODO:
+        Implement a standard ResNet-style convolutional block.
+
+        Args:
+            in_channels (int): Number of channels in the input feature map.
+            out_channels (int): Number of channels produced by the block (also number of channels after 1st Conv2D layer).
+            is_res (bool): Whether to include a residual connection.
+
+        - Use two Conv2D layers with:
+            - kernel size = 1
+            - stride = 1
+            - padding = 1
+        - Each followed by BatchNorm and GELU activation.
+        - Track if in_channels == out_channels (used for skip connection logic).
+        '''
+        self.same_channels = (in_channels == out_channels)
+        self.is_res = is_res
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(out_channels),
+            nn.GELU()
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(out_channels),
+            nn.GELU()
+        )
+
+        # Hint: you may want to store:
+        # self.same_channels
+        # self.is_res
+        # self.conv1 = nn.Sequential(...)
+        # self.conv2 = nn.Sequential(...)
+
+        #raise NotImplementedError("Define conv1, conv2, same_channels, and is_res here")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.is_res:
+            x1 = self.conv1(x)
+            x2 = self.conv2(x1)
+            if self.same_channels:
+                out = x + x2
+            else:
+                out = x1 + x2 
+            return out
+        else:
+            x1 = self.conv1(x)
+            x2 = self.conv2(x1)
+            return x2
+
+class CNN(nn.Module):
+
+    def __init__(self, history_length=0, n_classes=3):
+        super(CNN, self).__init__()
+        # TODO : define layers of a convolutional neural network
+        self.history_length = history_length
+        self.emb_size = 2304 # from torchsummary 9216
+
+        layers = [
+            nn.Conv2d(history_length, 8, kernel_size=3, stride=1, padding=1), # (96, 96) -> (48, 48)
+            nn.GELU(),
+            nn.MaxPool2d(2, stride=2),
+
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1), # (48, 48) -> (24, 24)
+            nn.GELU(),
+            nn.MaxPool2d(2, stride=2),
+
+            nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1),
+            
+            nn.AdaptiveMaxPool2d((12, 12)),  # (32, 1, 1)
+            nn.Flatten(),
+            nn.Linear(self.emb_size, n_classes)
+        ]
+        self.model = nn.Sequential(
+            *layers
+        )
+
+    def train_backbone(self, is_trainable):
+        return
+
+    def forward(self, x):
+        # TODO: compute forward pass
+        x = self.model(x)
+        return x
