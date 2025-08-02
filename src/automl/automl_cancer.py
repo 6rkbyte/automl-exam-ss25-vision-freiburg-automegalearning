@@ -11,6 +11,7 @@ import torch
 import random
 import numpy as np
 import logging
+from sklearn.metrics import accuracy_score
 
 from torch import nn, optim
 from torch.utils.data import DataLoader
@@ -24,6 +25,8 @@ from automl import pretrained
 import torchvision.transforms.v2 as transforms #!
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import optuna
+from time import time
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +45,9 @@ class AutoML:
         self,
         dataset_class: Any,
         hyperparams,
+        trial: optuna.Trial | None = None,
         epochs=5,
-        RESIZE_SIZE=0
+        RESIZE_SIZE=0,
     ) -> AutoML:
         """A reference/toy implementation of a fitting function for the AutoML class.
         """
@@ -60,128 +64,44 @@ class AutoML:
         res = min(dataset_class.width, RESIZE_SIZE) if RESIZE_SIZE != 0 else dataset_class.width #!
         res = (res, res) if isinstance(res, int) else res
         print(hyperparams)
-        # w = 4*res[0]/dataset_class.width #!#TODO normalization for blur
-        w=1 #!
+
+        #!# IGNORE (removed the rest of the augment code to make this easier to navigate. keeping this little part as a reminder, though.)
         TRIVIAL = False #!#TODO use TrivialAugment?
         AUGMENT = True
         print(f'Using TRIVIAL Augment?: {TRIVIAL}')
         augment_list = []
 
-        #!# Default (Manually choose Trivial, or Others)
-        if not TRIVIAL and AUGMENT:
-            if (rot := hyperparams['rot']) != 0:
-                augment_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BICUBIC))
-                # augment_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BILINEAR))
-            if (horflip := hyperparams['horflip']) != 0:
-                augment_list.append(transforms.RandomHorizontalFlip(horflip))
-                # transform_list.append(transforms.RandomHorizontalFlip())
-            if (verflip := hyperparams['verflip']) != 0:
-                augment_list.append(transforms.RandomVerticalFlip(verflip))
-                # transform_list.append(transforms.RandomVerticalFlip())
-            if (blurstddev := hyperparams['blur']) != 0:
-                # transform_list.append(transforms.GaussianBlur(kernel_size=(5,5), sigma=(0.1, blurstddev)))
-                #!#TODO normalize by imagesize (*w)
-                augment_list.append((transforms.RandomApply(
-                    [transforms.GaussianBlur(kernel_size=(3,3), sigma=(0.1*w, blurstddev*w))
-                    ], p=0.3)))
-            if (noisestddev := hyperparams['noise']) != 0:
-                # transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
-                #transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
-                augment_list.append(transforms.RandomApply([transforms.GaussianNoise(sigma=noisestddev)], p=0.3))
-            if (elastic := hyperparams['elastic']) != 0:
-                augment_list.append(transforms.RandomApply([transforms.ElasticTransform()], p=elastic))
-            if (gray := hyperparams['gray']) != 0:
-                augment_list.append(transforms.RandomApply([transforms.Grayscale(dataset_class.channels)], p=gray))
-            if (affine := hyperparams['affine']) != 0:
-                augment_list.append(transforms.RandomApply([transforms.RandomAffine(degrees=affine)], p=0.5))
-        elif TRIVIAL and AUGMENT:
-            trivial_augment = transforms.TrivialAugmentWide(interpolation=transforms.InterpolationMode.BICUBIC)
-            # trivial_augment = transforms.AugMix(interpolation=transforms.InterpolationMode.BILINEAR)
-            augment_list.append(trivial_augment)
-        #!/ Default (Manually choose Trivial, or Others)
-
-        #!# RandomChoice(Trivial, Others)
-        # if (rot := augments['rot']) != 0:
-        #     augment_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BICUBIC))
-        #     # augment_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BILINEAR))
-        # if (horflip := augments['horflip']) != 0:
-        #     augment_list.append(transforms.RandomHorizontalFlip(horflip))
-        #     # transform_list.append(transforms.RandomHorizontalFlip())
-        # if (verflip := augments['verflip']) != 0:
-        #     augment_list.append(transforms.RandomVerticalFlip(verflip))
-        #     # transform_list.append(transforms.RandomVerticalFlip())
-        # if (blurstddev := augments['blur']) != 0:
-        #     # transform_list.append(transforms.GaussianBlur(kernel_size=(5,5), sigma=(0.1, blurstddev)))
-        #     #!#TODO normalize by imagesize (*w)
-        #     augment_list.append((transforms.RandomApply(
-        #         [transforms.GaussianBlur(kernel_size=(3,3), sigma=(0.1*w, blurstddev*w))
-        #         ], p=0.3)))
-        # if (noisestddev := augments['noise']) != 0:
-        #     # transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
-        #     #transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
-        #     augment_list.append(transforms.RandomApply([transforms.GaussianNoise(sigma=noisestddev)], p=0.3))
-        # if (elastic := augments['elastic']) != 0:
-        #     augment_list.append(transforms.RandomApply([transforms.ElasticTransform()], p=elastic))
-        # if (gray := augments['gray']) != 0:
-        #     augment_list.append(transforms.RandomApply([transforms.Grayscale(dataset_class.channels)], p=gray))
-        # if (affine := augments['affine']) != 0:
-        #     augment_list.append(transforms.RandomApply([transforms.RandomAffine(degrees=affine)], p=0.5))
-        # trivial_augment = transforms.TrivialAugmentWide(interpolation=transforms.InterpolationMode.BICUBIC)
-        # # augment_list.append(trivial_augment)
-        # augment_list = [transforms.RandomChoice([transforms.Compose(augment_list), trivial_augment])]
-        #!/ RandomChoice(Trivial, Others)
-
-
-        # transform_list = []
-
-        # # if transform_list != []:
-        # #     transform_list = [transforms.RandomChoice([t for t in transform_list], p=None)] #TODO RandomChoice
-        # transform_list += [transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)]
-        # transform_list += [
-        #     #transforms.ToTensor(),
-        #     #transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True), # <=> ToTensor()
-        #     transforms.Normalize(*calculate_mean_std(dataset_class)),
-        # ]
         if not AUGMENT:
             transform_list = []
         else:
             transform_list = [a for a in augment_list]
-        # transform_list_MAIN += augment_list
         transforms_MAIN = [transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True), transforms.Normalize(*calculate_mean_std(dataset_class))]
         transform_list += transforms_MAIN
-        # transform_list_MAIN += [transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)]
-        #augment_list.append(transforms.Normalize(*calculate_mean_std(dataset_class)))
+        #!/ IGNORE
 
-        #!  size
-        #res = 0 # 0 (fullres), 84, 112, 224
-        #res = 56
+        #!  size; IGNORE
         fullres = (res[0] == dataset_class.width)
         if not fullres:
             transforms_MAIN = [transforms.Resize(res, interpolation=transforms.InterpolationMode.BICUBIC)] + transforms_MAIN
             transform_list = [transforms.Resize(res, interpolation=transforms.InterpolationMode.BICUBIC)] + transform_list
         transform_WITH_AUGMENTS = transforms.Compose(transform_list)
-        #self._transform = full_res_transform if fullres else transform
         self._transform = transforms.Compose(transforms_MAIN) #TODO separate; rebuild transforms in predict() instead of doing this
-		#!/ size
-        #epochs = 10 #!
-        #train_loader = DataLoader(dataset, batch_size=64, shuffle=True, pin_memory=True)
+        
         size = (dataset_class.width, dataset_class.height) if fullres else res #! size
         print(f'epochs: {epochs}') #! size
         print(f'size: {size[0]}x{size[1]} (fullsize: {fullres})\n') #! size
+		#!/ size; IGNORE
+
+        #!# prints, IGNORE
         transform_str = 'transforms:\n'
-        
-        # for t in augment_list:
-        for t in transform_list:
-            transform_str += f'- {t}\n'
-        print(transform_str)
-        transform_str = 'augments:\n'
-        
         # for t in augment_list:
         for t in augment_list:
             transform_str += f'- {t}\n'
         print(transform_str)
         if augment_list:
             augment_list = transforms.Compose(augment_list)
+        #!/ prints, IGNORE
+
         dataset = dataset_class(
             root="./data",
             split='train',
@@ -190,13 +110,10 @@ class AutoML:
         )
 
         #TODO n_workers train_loader
-        # train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=3, pin_memory=True, generator=torch.Generator().manual_seed(42))
-        num_workers = 4 if size[0] <= 256 else 2
+        num_workers = 4 if size[0] <= 256 else 2 #TODO remove num_workers? probably good tho. can their PCs use it? probably
         train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=num_workers, pin_memory=True)
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
-        # model = DummyNN(input_size, dataset_class.num_classes)
-        #model = CNN(dataset_class.channels, dataset_class.num_classes)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # INITIAL_LR = 0.003
@@ -204,66 +121,61 @@ class AutoML:
         INITIAL_LR = hyperparams['initial_lr']
         LR_DECAY = hyperparams['lr_decay']
         DROPOUT = hyperparams['dropout']
+        NETWORK = hyperparams['network']
+        #! I use a default dict to allow for easy code changes. This is here as a guard for when I'm not searching for these hyperparams,
+        #! e.g. choose_network(): calls .fit() with only <network_name> as hyperparam; use default values for these.
         if INITIAL_LR == 0 and LR_DECAY == 0 and DROPOUT == 0:
             INITIAL_LR = 0.003
             LR_DECAY = 0.2
             DROPOUT = 0.2
 
-        model = imitation_model.CNN(dataset_class.channels, dataset_class.num_classes).to(device)
-        model = pretrained.Mobilenet(input_shape=None, num_classes=dataset_class.num_classes, dropout=DROPOUT).to(device)
+        if NETWORK == 'pretrained':
+            model = pretrained.Mobilenet(input_shape=None, num_classes=dataset_class.num_classes, dropout=DROPOUT).to(device)
+        else:
+            model = imitation_model.CNN(dataset_class.channels, dataset_class.num_classes).to(device)
+        self._model = model
+        # model = pretrained.Vit(input_shape=dataset_class.channels, num_classes=dataset_class.num_classes).to(device)
 
-        # model = shufflenet_v2_x1_0(weights=ShuffleNet_V2_X1_0_Weights.DEFAULT)
         labels = torch.tensor([label for _, label in dataset]).to(device) #!
         
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=INITIAL_LR)
-        # optimizer = optim.AdamW(model.parameters(), lr=INITIAL_LR, weight_decay=1e-2)
+        # optimizer = optim.Adam(model.vit.head.parameters(), lr=INITIAL_LR)
+        # optimizer = optim.AdamW(model.parameters(), lr=INITIAL_LR, weight_decay=1e-2) #! other regularization options
         # optimizer = optim.Adam(model.fc.parameters(), lr=0.003)
         model.train()
-        predictions = [] #!
-        labels = [] #!
-        #!  time
-        from time import time
-        time_before_fit = time()
-        #!/ time
+        predictions = []
+        labels = []
+        time_before_fit = time() #! time
         print('\nStarting Training')
 
+        #! currently unused. 
         TRAIN_BACKBONE_INITIALLY = False # train flowers: 5 normal, 5 backbone (mby optuna: tune_backbone?, LRs) 
                                         # if small search space: grid search; if fast searching: large search space
-        TRAIN_BACKBONE_LATER = True
+        TRAIN_BACKBONE_LATER = False
         print(f'Initial LR: {INITIAL_LR}\nLR Decay: {LR_DECAY}\nDropout: {DROPOUT}')
-        print(f'Training backbone:\n- Initially: {TRAIN_BACKBONE_INITIALLY}\n- Later: {TRAIN_BACKBONE_LATER}\n')
-        model.train_backbone(TRAIN_BACKBONE_INITIALLY) #!#TODO train backbone!
+        # print(f'Training backbone:\n- Initially: {TRAIN_BACKBONE_INITIALLY}\n- Later: {TRAIN_BACKBONE_LATER}\n')
+        # model.train_backbone(TRAIN_BACKBONE_INITIALLY) #!
         for epoch in range(epochs):
             time_before_epoch = time() #! time
             loss_per_batch = []
-            if dataset_class._dataset_name == 'skin_cancer':
-                # lr_decrease_epoch = 4
-                lr_decrease_epoch = 5
-            elif dataset_class._dataset_name == 'flowers':
-                lr_decrease_epoch = 5
-            else:
-                lr_decrease_epoch = 5
+            # if dataset_class._dataset_name == 'skin_cancer':
+            #     # lr_decrease_epoch = 4
+            #     lr_decrease_epoch = 5
+            # elif dataset_class._dataset_name == 'flowers':
+            #     lr_decrease_epoch = 5
+            # else:
+            #     lr_decrease_epoch = 5
+            lr_decrease_epoch = 5 #!#TODO choose this?
             if epoch == lr_decrease_epoch:
-                model.train_backbone(TRAIN_BACKBONE_LATER) #!#TODO train backbone!
+                # model.train_backbone(TRAIN_BACKBONE_LATER) #!
                 for pg in optimizer.param_groups:
                     pg['lr'] *= LR_DECAY
                     # pg['lr'] = 0.0006
                     # pg['lr'] *= 0.1
+
             for _, (data, target) in enumerate(train_loader):
                 data = data.to(device)
-                # data = augment_list(data)
-                #!  LR
-                #if epoch == 10:
-                #TODO
-                # previously: 4, then 10
-                # lr_decrease_epoch = 10 if dataset_class._dataset_name != 'skin_cancer' else 4
-                # lr_decrease_epoch = 5 if dataset_class._dataset_name != 'skin_cancer' else 4
-                # elif epoch == 10: #TODO LR
-                #     for pg in optimizer.param_groups:
-                #         pg['lr'] = 0.00003
-                #!/ LR
-                # data = data.to(device)
                 target = target.to(device)
                 
                 optimizer.zero_grad()
@@ -273,28 +185,38 @@ class AutoML:
                 optimizer.step()
                 loss_per_batch.append(loss.item())
 
-                predicted = torch.argmax(output, 1)   #! accuracy
-                
+                #!# accuracy
+                predicted = torch.argmax(output, 1)   
                 target = target.to('cpu')
                 predicted = predicted.to('cpu')
-                
-                predictions.append(predicted.numpy()) #! accuracy
-                labels.append(target.numpy())         #! accuracy
+                predictions.append(predicted.numpy())
+                labels.append(target.numpy())        
+                #!/ accuracy
             predictions = np.concatenate(predictions)
             labels = np.concatenate(labels)
-            time_after_epoch = time() #! time
+            
+            #!# time
+            time_after_epoch = time()
             timediff = time_after_epoch - time_before_epoch
             #logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {timediff // 60:.0f}m{timediff % 60:.3f}s") #!
-            print(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {timediff // 60:.0f}m{timediff % 60:.3f}s")
-            
-			#!  accuracy & time
-            from sklearn.metrics import accuracy_score
+            print(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}, Time: {timediff // 60:.0f}m{timediff % 60:.3f}s\n")
+            #!/ time
+			#!  accuracy
             if not np.isnan(labels).any():
                 acc = accuracy_score(labels, predictions)
                 #logger.info(f"Accuracy on train set: {acc}\n") #!
-                print(f"Accuracy on train set: {acc}\n")
+                print(f"Accuracy on train set: {acc}")
                 labels, predictions = [], []
-            #!/ accuracy & time
+            #!/ accuracy
+            
+            # model.eval()
+            # val_predictions, val_labels = self.predict(dataset_class, val_loader)
+            # val_acc = accuracy_score(val_labels, val_predictions)
+            # trial.report(val_acc, epoch)
+            # if trial.should_prune():
+            #     raise optuna.exceptions.TrialPruned()
+            # model.train()
+
         #!  time
         time_after_fit = time()
         timediff = time_after_fit - time_before_fit
@@ -302,12 +224,10 @@ class AutoML:
         print(f"{timediff // 60:.0f}m{timediff % 60:.3f}s")
         #!/ time
             
-        model.eval()
-        self._model = model
 
         return self
 
-    def predict(self, dataset_class) -> Tuple[np.ndarray, np.ndarray]:
+    def predict(self, dataset_class, data_loader: DataLoader | None = None) -> Tuple[np.ndarray, np.ndarray]:
         """A reference/toy implementation of a prediction function for the AutoML class.
         """
         split = 'val' if dataset_class._dataset_name == 'skin_cancer' else 'test'
@@ -317,8 +237,8 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        # data_loader = DataLoader(dataset, batch_size=100, shuffle=False, pin_memory=True, num_workers=2) #TODO remove num_workers? probably good tho. can their PCs use it? probably
-        data_loader = DataLoader(dataset, batch_size=100, shuffle=False, pin_memory=True) #TODO remove num_workers? probably good tho. can their PCs use it? probably
+        if data_loader == None:
+            data_loader = DataLoader(dataset, batch_size=100, shuffle=False, pin_memory=True)
         predictions = []
         labels = []
         self._model.eval()
@@ -335,7 +255,7 @@ class AutoML:
                 
                 predicted = predicted.to('cpu')
                 target = target.to('cpu')
-                
+
                 labels.append(target.numpy())
                 predictions.append(predicted.numpy())
         predictions = np.concatenate(predictions)

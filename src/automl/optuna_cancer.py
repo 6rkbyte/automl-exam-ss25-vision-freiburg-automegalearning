@@ -14,10 +14,35 @@ from automl.automl_cancer import AutoML
 from automl.datasets_cancer import FashionDataset, FlowersDataset, EmotionsDataset, SkinCancerDataset
 import optuna
 from collections import defaultdict
+from torch import nn
+import sqlalchemy
 
 logger = logging.getLogger(__name__)
 
+def choose_network() -> nn.Module:
+    print(f'\n{dataset_class._dataset_name}')
+    automl = AutoML(seed=seed) #TODO fix seed thing
+    
+    hyperparams = defaultdict(int)
+    networks = ['pretrained', 'scratch']
+    best_acc = 0
+    best = networks[0]
+
+    for choice in networks:
+        hyperparams['network'] = choice
+        automl.fit(dataset_class, hyperparams, epochs=2, RESIZE_SIZE=resize)
+        preds, labels = automl.predict(dataset_class)
+        acc = accuracy_score(labels, preds)
+        if acc > best_acc:
+            best_acc = acc
+            best = choice
+        print(f"Accuracy of {choice} on test set: {acc}\n")
+    print(f'BEST NETWORK: {best}\n\n')
+    return best
+		
+
 def objective(trial: optuna.Trial):
+    hyperparams = defaultdict(int)
 	#TODO blur kernel size? or probability of blur? probability of rotation? learning rate schedule? (e.g. cut LR every # epochs... or other methods)
     # rot = trial.suggest_int('rot', 0, 60, step=15)
     # horflip = trial.suggest_float('horflip', 0, 0.4, step=0.1)
@@ -25,20 +50,21 @@ def objective(trial: optuna.Trial):
     # blur = trial.suggest_float('blur', low=0, high=3, step=1)
     # affine = trial.suggest_int('affine', 0, 60, step=15)
     #noise = trial.suggest_float('noise', low=0, high=0.2, step=0.05)
+    # network = trial.suggest_categorical(name='network', choices=['scratch', 'pretrained'])
+    # augments.update(dict(rot=rot, horflip=horflip))
+
     initial_lr = trial.suggest_float(name='initial_lr', low=1e-3, high=1e-2, log=True)
-    lr_decay = trial.suggest_float(name='lr_decay', low=0.1, high=0.5)
-    dropout = trial.suggest_float(name='dropout', low=0, high=0.4, step=0.1)
-    print(f'\n{dataset_class._dataset_name}')
+    # lr_decay = trial.suggest_float(name='lr_decay', low=0.1, high=0.5)
+    # dropout = trial.suggest_float(name='dropout', low=0, high=0.4, step=0.1)
+    # print(f'\n{dataset_class._dataset_name}')
+
     automl = AutoML(seed=seed) #TODO fix seed thing
     
-    #augments = dict(rot=rot, horflip=horflip, blur=blur, noise=noise)
-    #augments = dict(rot=rot, horflip=horflip, verflip=verflip, noise=noise)
-    hyperparams = defaultdict(int) #TODO default dict to make removing stuff easier (will need to cleanup automl2 later anyways, though.)
     # hyperparams.update(dict(rot=rot, horflip=horflip, verflip=verflip, blur=blur, affine=affine))
-    hyperparams.update(dict(initial_lr=initial_lr, lr_decay=lr_decay, dropout=dropout))
-    # augments.update(dict(rot=rot, horflip=horflip))
+    # hyperparams.update(dict(initial_lr=initial_lr, lr_decay=lr_decay, dropout=dropout, network=network))
+    hyperparams.update(dict(initial_lr=initial_lr, network=network))
 	#!
-    automl.fit(dataset_class, hyperparams, epochs=epochs, RESIZE_SIZE=resize)
+    automl.fit(dataset_class, hyperparams, epochs=epochs, RESIZE_SIZE=resize, trial=trial)
     preds, labels = automl.predict(dataset_class)
     if not np.isnan(labels).any(): #TODO remove
         acc = accuracy_score(labels, preds)
@@ -48,40 +74,9 @@ def objective(trial: optuna.Trial):
         print('DID NOT FIND LABELS')
     return acc
 
-
-# pipeline_space = dict(
-# 	rot = neps.Integer(
-# 		lower=0,
-# 		upper=90,
-# 		prior=30,
-#         prior_confidence='medium',
-# 	),
-# 	# horflip = neps.Float(
-# 	# 	lower=0,
-# 	# 	upper=0.4,
-# 	# 	prior=0.2,
-# 	# ),
-# 	horflip = neps.Categorical(
-# 		choices=[0.1, 0.2, 0.3, 0.4],
-# 		prior=0.2,
-# 	),
-#     blur = neps.Categorical( #TODO allow bigger sigmas
-#         # choices=[0, 0.1, 0.2],
-#         choices=[0, 0.2, 0.5, 1],
-# 	), #TODO float makes it die? try giving it a prior, mby it makes it work (although the bug is still there obv. and probably still is w/ Categorical)
-#     noise = neps.Categorical( #TODO allow bigger sigmas
-#         #choices=[0, 0.1, 0.2],
-#         choices=[0, 0.2, 0.5, 1],
-# 	),
-#     # blur = neps.Float(
-#     #     lower=0,
-#     #     upper=0.2,
-# 	# )#TODO add tanh, etc.
-# 	#dataset_class=datasets.EmotionsDataset, #!
-# )
 import logging, sys #!
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, stream=sys.stdout) #!
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout) #! this turned out to do nothing
 #logging.basicConfig(level=logging.INFO)
 
 
@@ -162,11 +157,13 @@ match dataset:
 size = min(dataset_class.width, resize) if resize != 0 else dataset_class.width
 study_name = f'{dataset} ({size}x{size}), trials={trials}, epochs={epochs}'
 
-output_file = f'optuna_res/{study_name}.txt'
+res_dir = 'optuna_res'
+output_file = f'{res_dir}/{study_name}.txt'
+os.makedirs(res_dir,exist_ok=True)
 
 assert not os.path.isfile(output_file), 'A .txt for this study already exists. Rename it.'
 
-psql = "postgresql://diogo:digypsql@localhost/automl_optuna"
+psql = "postgresql://diogwo:digypsql@localhost/automl_optuna"
 if replace or delete:
 	try:
 		optuna.delete_study(study_name=study_name, storage=psql)
@@ -175,16 +172,26 @@ if replace or delete:
 			quit()
 	except KeyError as err:
 		pass
+	except sqlalchemy.exc.OperationalError as err: #! you guys are not using psql. This makes it so you don't need to change anything
+		pass
 try:
 	study = optuna.load_study(study_name=study_name, storage=psql)
 except KeyError as err:
 	# study = optuna.create_study(direction='maximize', study_name=study_name, storage=psql, 
 	# 			sampler=optuna.samplers.TPESampler(multivariate=True, n_startup_trials=40))#,constant_liar=True)) #TODO sampler
+	# study = optuna.create_study(direction='maximize', study_name=study_name, storage=psql, 
+	# 			sampler=optuna.samplers.TPESampler(multivariate=True, n_ei_candidates=100,constant_liar=True),
+	# 			pruner=optuna.pruners.HyperbandPruner())#,constant_liar=True)) #TODO sampler
 	study = optuna.create_study(direction='maximize', study_name=study_name, storage=psql, 
-				sampler=optuna.samplers.TPESampler(multivariate=True, n_startup_trials=15, n_ei_candidates=100,constant_liar=True))#,constant_liar=True)) #TODO sampler
+				sampler=optuna.samplers.TPESampler(multivariate=True, n_ei_candidates=100,constant_liar=True)) #! constant_liar is for multiprocess
 # study = optuna.create_study(direction='maximize', study_name=study_name) #TODO sampler
+except sqlalchemy.exc.OperationalError as err:
+	#! this is the only part of the try catch you are running. Ignore everything else (psql related)
+	study = optuna.create_study(direction='maximize', study_name=study_name, 
+				sampler=optuna.samplers.TPESampler(multivariate=True, n_ei_candidates=100,constant_liar=True),)
 
 t_before_study = time()
+network = choose_network() #!
 study.optimize(func=objective, n_trials=trials)
 # quit() #! REQUIRED FOR PARALLELIZING; RUN write_optuna.py AFTERWARDS 
 #! (otherwise, will bug out due to incomplete trials: the ones the other process is still calculating!)
