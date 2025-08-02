@@ -29,3 +29,43 @@ def calculate_mean_std(dataset_class: Any):
     std /= total_images_count
 
     return mean, std
+
+class TrainLog:
+    """
+    Just a list to store the loss and time.
+    """
+
+    def __init__(self):
+        # {"metric_name": [x_list, y_list], ...}
+        self.data = {}
+
+    def append(self, metric: str, x: float, y: float):
+        if metric not in self.data:
+            self.data[metric] = [[], []] # [x_list, y_list]
+
+        self.data[metric][0].append(x) # x_list
+        self.data[metric][1].append(y) # y_list
+
+def plot_loss(log: TrainLog):
+    """
+    Plot value array y over time t.
+    """
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 3))
+
+    t = log.data['train'][0]
+    y = log.data['train'][1]
+    ax.plot(t, y, color='b', label='train')
+
+    t = log.data['val'][0]
+    y = log.data['val'][1]
+    ax.plot(t, y, color='g', label='val')
+
+    ax.set_title('Loss')
+    ax.set_xlabel('Epoch')
+    #ax.set_xticks(np.arange(t[0], t[-1]+1, len(t)//10+1))
+    ax.grid(True)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig("loss_curve.png")
+    plt.show()

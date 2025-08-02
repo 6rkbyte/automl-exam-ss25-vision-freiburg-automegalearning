@@ -16,11 +16,16 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from automl.dummy_model import DummyNN, CNN
+from automl.dummy_model import DummyNN
+from automl.imitation_model import CNN
+from automl.pretrained import Mobilenet
 from automl.utils import calculate_mean_std
+from automl.utils import TrainLog
 
 
 logger = logging.getLogger(__name__)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+#device = "cpu"
 
 
 class AutoML:
@@ -31,6 +36,7 @@ class AutoML:
     ) -> None:
         self.seed = seed
         self._model: nn.Module | None = None
+        self.train_log: TrainLog = TrainLog()
 
     def fit(
         self,
@@ -60,26 +66,48 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+        train_loader = DataLoader(dataset, batch_size=128, shuffle=True) # 64
 
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
         #model = DummyNN(input_size, dataset_class.num_classes)
         model = CNN(dataset_class.channels, dataset_class.num_classes)
+        #model = Mobilenet(dataset_class.channels, dataset_class.num_classes)
+        
+        model = model.to(device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.003)
+        optimizer = optim.Adam(model.parameters(), lr=0.005) # 0.003
+        # 1) mobilenet
+        # lr 0.001 loss 0.93 test 0.67
+        # lr 0.003 same
+
+        # fashion DummyNN lr 0.005
+        # epoch 20 lr 0.005 loss 0.17 test 0.878
+        
+        # fashion mobilenet lr 0.005
+        # epoch 5 loss 0.577
+        # epoch 10 loss 0.387
+        # epoch 20 loss 0.273 test 0.70
+        
+        # fashion cnn lr 0.005
+        # epoch 20 loss 0.130 test 0.89
         
         model.train()
-        for epoch in range(5):
+        for epoch in range(20):
             loss_per_batch = []
             for _, (data, target) in enumerate(train_loader):
+                data = data.to(device)
+                target = target.to(device)
+                
                 optimizer.zero_grad()
                 output = model(data)
                 loss = criterion(output, target)
                 loss.backward()
                 optimizer.step()
                 loss_per_batch.append(loss.item())
-            logger.info(f"Epoch {epoch + 1}, Loss: {np.mean(loss_per_batch)}")
+            loss_mean = np.mean(loss_per_batch)
+            logger.info(f"Epoch {epoch + 1}, Loss: {loss_mean}")
+            self.train_log.append("train", epoch, loss_mean)
         model.eval()
         self._model = model
 
@@ -94,16 +122,19 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        data_loader = DataLoader(dataset, batch_size=100, shuffle=False)
+        data_loader = DataLoader(dataset, batch_size=100, shuffle=False) # 100
         predictions = []
         labels = []
         self._model.eval()
         with torch.no_grad():
             for data, target in data_loader:
+                data = data.to(device)
+                target = target.to(device)
+                
                 output = self._model(data)
                 predicted = torch.argmax(output, 1)
-                labels.append(target.numpy())
-                predictions.append(predicted.numpy())
+                labels.append(target.cpu().numpy())
+                predictions.append(predicted.cpu().numpy())
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
         

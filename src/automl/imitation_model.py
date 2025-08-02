@@ -125,33 +125,31 @@ class PointConv(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, history_length=0, n_classes=3):
+    def __init__(self, input_channels=None, n_classes=3):
         super(CNN, self).__init__()
         # TODO : define layers of a convolutional neural network
-        self.history_length = history_length
-        self.emb_size = 2304 # from torchsummary 9216
+        self.emb_size = 16 * 4 * 4
 
         layers = [
-            nn.Conv2d(history_length, 8, kernel_size=3, stride=1, padding=1), # (96, 96) -> (48, 48)
+            nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1), # (3, 48, 48) -> (16, 24, 24)
+            nn.BatchNorm2d(16),
             nn.GELU(),
             nn.MaxPool2d(2, stride=2),
-
-            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1), # (48, 48) -> (24, 24)
-            nn.GELU(),
-            nn.MaxPool2d(2, stride=2),
-
-            nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1),
             
-            nn.AdaptiveMaxPool2d((12, 12)),  # (32, 1, 1)
+            nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(16),
+            nn.GELU(),
+            
+            nn.AdaptiveMaxPool2d((4, 4)),  # (16, 4, 4)
             nn.Flatten(),
-            nn.Linear(self.emb_size, n_classes)
+            
+            nn.Linear(self.emb_size, 128),
+            nn.GELU(),
+            nn.Linear(128, n_classes)
         ]
         self.model = nn.Sequential(
             *layers
         )
-
-    def train_backbone(self, is_trainable):
-        return
 
     def forward(self, x):
         # TODO: compute forward pass
