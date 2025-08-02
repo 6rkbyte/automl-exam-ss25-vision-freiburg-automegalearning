@@ -19,6 +19,7 @@ from torchvision import transforms
 from automl.dummy_model import DummyNN
 from automl.imitation_model import CNN
 from automl.pretrained import Mobilenet
+from automl.vit import Vit
 from automl.utils import calculate_mean_std
 from automl.utils import TrainLog
 
@@ -66,17 +67,18 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        train_loader = DataLoader(dataset, batch_size=128, shuffle=True) # 64
+        train_loader = DataLoader(dataset, batch_size=512, shuffle=True) # 64
 
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
         #model = DummyNN(input_size, dataset_class.num_classes)
-        model = CNN(dataset_class.channels, dataset_class.num_classes)
+        #model = CNN(dataset_class.channels, dataset_class.num_classes)
         #model = Mobilenet(dataset_class.channels, dataset_class.num_classes)
+        model = Vit(dataset_class.channels, dataset_class.num_classes)
         
         model = model.to(device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.005) # 0.003
+        optimizer = optim.Adam(model.parameters(), lr=0.001) # 0.003
         # 1) mobilenet
         # lr 0.001 loss 0.93 test 0.67
         # lr 0.003 same
@@ -91,6 +93,9 @@ class AutoML:
         
         # fashion cnn lr 0.005
         # epoch 20 loss 0.130 test 0.89
+        
+        # flowers vit lr 0.001
+        # epoch 20 loss 0.002 test 0.985
         
         model.train()
         for epoch in range(20):
