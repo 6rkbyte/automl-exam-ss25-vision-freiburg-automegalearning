@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader
 from automl.utils import calculate_mean_std
 
 from automl import imitation_model
+from automl import pretrained
 import torchvision.transforms.v2 as transforms #!
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -36,10 +37,11 @@ class AutoML:
         self.seed = seed
         self._model: nn.Module | None = None
 
+
     def fit(
         self,
         dataset_class: Any,
-        augments,
+        hyperparams,
         epochs=5,
         RESIZE_SIZE=0
     ) -> AutoML:
@@ -57,7 +59,7 @@ class AutoML:
 
         res = min(dataset_class.width, RESIZE_SIZE) if RESIZE_SIZE != 0 else dataset_class.width #!
         res = (res, res) if isinstance(res, int) else res
-        print(augments)
+        print(hyperparams)
         # w = 4*res[0]/dataset_class.width #!#TODO normalization for blur
         w=1 #!
         TRIVIAL = False #!#TODO use TrivialAugment?
@@ -67,32 +69,32 @@ class AutoML:
 
         #!# Default (Manually choose Trivial, or Others)
         if not TRIVIAL and AUGMENT:
-            if (rot := augments['rot']) != 0:
+            if (rot := hyperparams['rot']) != 0:
                 augment_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BICUBIC))
                 # augment_list.append(transforms.RandomRotation(degrees=rot, interpolation=transforms.InterpolationMode.BILINEAR))
-            if (horflip := augments['horflip']) != 0:
+            if (horflip := hyperparams['horflip']) != 0:
                 augment_list.append(transforms.RandomHorizontalFlip(horflip))
                 # transform_list.append(transforms.RandomHorizontalFlip())
-            if (verflip := augments['verflip']) != 0:
+            if (verflip := hyperparams['verflip']) != 0:
                 augment_list.append(transforms.RandomVerticalFlip(verflip))
                 # transform_list.append(transforms.RandomVerticalFlip())
-            if (blurstddev := augments['blur']) != 0:
+            if (blurstddev := hyperparams['blur']) != 0:
                 # transform_list.append(transforms.GaussianBlur(kernel_size=(5,5), sigma=(0.1, blurstddev)))
                 #!#TODO normalize by imagesize (*w)
                 augment_list.append((transforms.RandomApply(
                     [transforms.GaussianBlur(kernel_size=(3,3), sigma=(0.1*w, blurstddev*w))
                     ], p=0.3)))
-            if (noisestddev := augments['noise']) != 0:
+            if (noisestddev := hyperparams['noise']) != 0:
                 # transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
                 #transform_list.append(transforms.GaussianNoise(sigma=noisestddev))
                 augment_list.append(transforms.RandomApply([transforms.GaussianNoise(sigma=noisestddev)], p=0.3))
-            if (elastic := augments['elastic']) != 0:
+            if (elastic := hyperparams['elastic']) != 0:
                 augment_list.append(transforms.RandomApply([transforms.ElasticTransform()], p=elastic))
-            if (gray := augments['gray']) != 0:
+            if (gray := hyperparams['gray']) != 0:
                 augment_list.append(transforms.RandomApply([transforms.Grayscale(dataset_class.channels)], p=gray))
-            if (affine := augments['affine']) != 0:
+            if (affine := hyperparams['affine']) != 0:
                 augment_list.append(transforms.RandomApply([transforms.RandomAffine(degrees=affine)], p=0.5))
-        elif TRIVIAL:
+        elif TRIVIAL and AUGMENT:
             trivial_augment = transforms.TrivialAugmentWide(interpolation=transforms.InterpolationMode.BICUBIC)
             # trivial_augment = transforms.AugMix(interpolation=transforms.InterpolationMode.BILINEAR)
             augment_list.append(trivial_augment)
@@ -189,22 +191,33 @@ class AutoML:
 
         #TODO n_workers train_loader
         # train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=3, pin_memory=True, generator=torch.Generator().manual_seed(42))
-        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+        num_workers = 4 if size[0] <= 256 else 2
+        train_loader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=num_workers, pin_memory=True)
         input_size = dataset_class.width * dataset_class.height * dataset_class.channels
 
         # model = DummyNN(input_size, dataset_class.num_classes)
         #model = CNN(dataset_class.channels, dataset_class.num_classes)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # INITIAL_LR = 0.003
+        # INITIAL_LR = 0.005
+        INITIAL_LR = hyperparams['initial_lr']
+        LR_DECAY = hyperparams['lr_decay']
+        DROPOUT = hyperparams['dropout']
+        if INITIAL_LR == 0 and LR_DECAY == 0 and DROPOUT == 0:
+            INITIAL_LR = 0.003
+            LR_DECAY = 0.2
+            DROPOUT = 0.2
+
         model = imitation_model.CNN(dataset_class.channels, dataset_class.num_classes).to(device)
+        model = pretrained.Mobilenet(input_shape=None, num_classes=dataset_class.num_classes, dropout=DROPOUT).to(device)
+
         # model = shufflenet_v2_x1_0(weights=ShuffleNet_V2_X1_0_Weights.DEFAULT)
-        # model.fc = nn.Linear(model.fc.in_features, dataset_class.num_classes)
-        # labels = torch.tensor([label for _, label in dataset]).to(device) #!
-        # class_counts = torch.bincount(labels)                             #!
-        # class_weights = 1.0 / class_counts.float()                        #!
-        # criterion = nn.CrossEntropyLoss(weight=class_weights)             #!
+        labels = torch.tensor([label for _, label in dataset]).to(device) #!
         
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.003)
+        optimizer = optim.Adam(model.parameters(), lr=INITIAL_LR)
+        # optimizer = optim.AdamW(model.parameters(), lr=INITIAL_LR, weight_decay=1e-2)
         # optimizer = optim.Adam(model.fc.parameters(), lr=0.003)
         model.train()
         predictions = [] #!
@@ -213,16 +226,30 @@ class AutoML:
         from time import time
         time_before_fit = time()
         #!/ time
-        print('starting SGD')
+        print('\nStarting Training')
 
+        TRAIN_BACKBONE_INITIALLY = False # train flowers: 5 normal, 5 backbone (mby optuna: tune_backbone?, LRs) 
+                                        # if small search space: grid search; if fast searching: large search space
+        TRAIN_BACKBONE_LATER = True
+        print(f'Initial LR: {INITIAL_LR}\nLR Decay: {LR_DECAY}\nDropout: {DROPOUT}')
+        print(f'Training backbone:\n- Initially: {TRAIN_BACKBONE_INITIALLY}\n- Later: {TRAIN_BACKBONE_LATER}\n')
+        model.train_backbone(TRAIN_BACKBONE_INITIALLY) #!#TODO train backbone!
         for epoch in range(epochs):
-            # if epoch >= 3: #TODO is this useful? (idea: get fast good progress in first few epochs, then get better but slower progress w/ next epochs)
-            #     #! basically, get good "nearly-initial" weights 
-            #     dataset.transform = med_res_transform
-            # elif epoch >= d6:
-            #     dataset.transform = full_res_transform
             time_before_epoch = time() #! time
             loss_per_batch = []
+            if dataset_class._dataset_name == 'skin_cancer':
+                # lr_decrease_epoch = 4
+                lr_decrease_epoch = 5
+            elif dataset_class._dataset_name == 'flowers':
+                lr_decrease_epoch = 5
+            else:
+                lr_decrease_epoch = 5
+            if epoch == lr_decrease_epoch:
+                model.train_backbone(TRAIN_BACKBONE_LATER) #!#TODO train backbone!
+                for pg in optimizer.param_groups:
+                    pg['lr'] *= LR_DECAY
+                    # pg['lr'] = 0.0006
+                    # pg['lr'] *= 0.1
             for _, (data, target) in enumerate(train_loader):
                 data = data.to(device)
                 # data = augment_list(data)
@@ -232,15 +259,6 @@ class AutoML:
                 # previously: 4, then 10
                 # lr_decrease_epoch = 10 if dataset_class._dataset_name != 'skin_cancer' else 4
                 # lr_decrease_epoch = 5 if dataset_class._dataset_name != 'skin_cancer' else 4
-                if dataset_class._dataset_name == 'skin_cancer':
-                    lr_decrease_epoch = 4
-                elif dataset_class._dataset_name == 'flowers':
-                    lr_decrease_epoch = 10
-                else:
-                    lr_decrease_epoch = 5
-                if epoch == lr_decrease_epoch:
-                    for pg in optimizer.param_groups:
-                        pg['lr'] = 0.0006
                 # elif epoch == 10: #TODO LR
                 #     for pg in optimizer.param_groups:
                 #         pg['lr'] = 0.00003
@@ -299,7 +317,8 @@ class AutoML:
             download=True,
             transform=self._transform
         )
-        data_loader = DataLoader(dataset, batch_size=100, shuffle=False, pin_memory=True, num_workers=2) #TODO remove num_workers? probably good tho. can their PCs use it? probably
+        # data_loader = DataLoader(dataset, batch_size=100, shuffle=False, pin_memory=True, num_workers=2) #TODO remove num_workers? probably good tho. can their PCs use it? probably
+        data_loader = DataLoader(dataset, batch_size=100, shuffle=False, pin_memory=True) #TODO remove num_workers? probably good tho. can their PCs use it? probably
         predictions = []
         labels = []
         self._model.eval()

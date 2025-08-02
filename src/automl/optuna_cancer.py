@@ -19,22 +19,26 @@ logger = logging.getLogger(__name__)
 
 def objective(trial: optuna.Trial):
 	#TODO blur kernel size? or probability of blur? probability of rotation? learning rate schedule? (e.g. cut LR every # epochs... or other methods)
-    rot = trial.suggest_int('rot', 0, 60, step=15)
-    horflip = trial.suggest_float('horflip', 0, 0.4, step=0.1)
-    verflip = trial.suggest_float('verflip', 0, 0.4, step=0.1)
-    blur = trial.suggest_float('blur', low=0, high=3, step=1)
-    affine = trial.suggest_int('affine', 0, 60, step=15)
+    # rot = trial.suggest_int('rot', 0, 60, step=15)
+    # horflip = trial.suggest_float('horflip', 0, 0.4, step=0.1)
+    # verflip = trial.suggest_float('verflip', 0, 0.4, step=0.1)
+    # blur = trial.suggest_float('blur', low=0, high=3, step=1)
+    # affine = trial.suggest_int('affine', 0, 60, step=15)
     #noise = trial.suggest_float('noise', low=0, high=0.2, step=0.05)
+    initial_lr = trial.suggest_float(name='initial_lr', low=1e-3, high=1e-2, log=True)
+    lr_decay = trial.suggest_float(name='lr_decay', low=0.1, high=0.5)
+    dropout = trial.suggest_float(name='dropout', low=0, high=0.4, step=0.1)
     print(f'\n{dataset_class._dataset_name}')
     automl = AutoML(seed=seed) #TODO fix seed thing
     
     #augments = dict(rot=rot, horflip=horflip, blur=blur, noise=noise)
     #augments = dict(rot=rot, horflip=horflip, verflip=verflip, noise=noise)
-    augments = defaultdict(int) #TODO default dict to make removing stuff easier (will need to cleanup automl2 later anyways, though.)
-    augments.update(dict(rot=rot, horflip=horflip, verflip=verflip, blur=blur, affine=affine))
+    hyperparams = defaultdict(int) #TODO default dict to make removing stuff easier (will need to cleanup automl2 later anyways, though.)
+    # hyperparams.update(dict(rot=rot, horflip=horflip, verflip=verflip, blur=blur, affine=affine))
+    hyperparams.update(dict(initial_lr=initial_lr, lr_decay=lr_decay, dropout=dropout))
     # augments.update(dict(rot=rot, horflip=horflip))
 	#!
-    automl.fit(dataset_class, augments, epochs=epochs, RESIZE_SIZE=resize)
+    automl.fit(dataset_class, hyperparams, epochs=epochs, RESIZE_SIZE=resize)
     preds, labels = automl.predict(dataset_class)
     if not np.isnan(labels).any(): #TODO remove
         acc = accuracy_score(labels, preds)
@@ -162,8 +166,6 @@ output_file = f'optuna_res/{study_name}.txt'
 
 assert not os.path.isfile(output_file), 'A .txt for this study already exists. Rename it.'
 
-import torch
-torch.multiprocessing.set_start_method('spawn')
 psql = "postgresql://diogo:digypsql@localhost/automl_optuna"
 if replace or delete:
 	try:
@@ -179,7 +181,7 @@ except KeyError as err:
 	# study = optuna.create_study(direction='maximize', study_name=study_name, storage=psql, 
 	# 			sampler=optuna.samplers.TPESampler(multivariate=True, n_startup_trials=40))#,constant_liar=True)) #TODO sampler
 	study = optuna.create_study(direction='maximize', study_name=study_name, storage=psql, 
-				sampler=optuna.samplers.TPESampler(multivariate=True, n_startup_trials=20, n_ei_candidates=200,constant_liar=True))#,constant_liar=True)) #TODO sampler
+				sampler=optuna.samplers.TPESampler(multivariate=True, n_startup_trials=15, n_ei_candidates=100,constant_liar=True))#,constant_liar=True)) #TODO sampler
 # study = optuna.create_study(direction='maximize', study_name=study_name) #TODO sampler
 
 t_before_study = time()

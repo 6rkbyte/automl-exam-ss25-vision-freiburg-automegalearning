@@ -159,8 +159,8 @@ import plotly.io as pio
 # print(pio.renderers)
 pio.renderers.default = "browser"
 # print(optuna.get_all_study_names(storage=psql))
-optim_history.show()
-param_importances.show()
+# optim_history.show()
+# param_importances.show()
 if not nohtml:
 	optim_history.write_html(f"optuna_res/plots/{study_name} - optimization history.html")
 	param_importances.write_html(f"optuna_res/plots/{study_name} - param importances.html")
@@ -197,7 +197,7 @@ output_str += f'------ rankings ------\n\n'
 for t in sorted_trials:
 	number = t.number if t.number is not None else 'None'
 	value = f'{t.value:.5f}' if t.value is not None else 'None'
-	params = {k: f'{v:.2f}' for k, v in t.params.items()} if t.params is not None else 'None'
+	params = {k: f'{v:.5f}' for k, v in t.params.items()} if t.params is not None else 'None'
 	output_str += f'{t.number}: {value}; {params}\n'
 
 output_str += '\n'
@@ -208,7 +208,8 @@ for t in trials:
 	#print(f'trial {i}:\n- {t.params}\n- {t.value}\n')
 	number = t.number if t.number is not None else 'None'
 	value = f'{t.value:.5f}' if t.value is not None else 'None'
-	params = {k: f'{v:.2f}' for k, v in t.params.items()} if t.params is not None else 'None'
+	# params = {k: f'{v:.4f}' for k, v in t.params.items()} if t.params is not None else 'None'
+	params = {k: f'{v:.5f}' for k, v in t.params.items()} if t.params is not None else 'None'
 	output_str += f'trial {number}:\n- {params}\n- accuracy: {value}\n\n'
 
 #print(f'best params: {best.params}\naccuracy: best.value')

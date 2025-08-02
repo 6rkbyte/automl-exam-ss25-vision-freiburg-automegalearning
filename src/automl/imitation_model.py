@@ -157,3 +157,37 @@ class CNN(nn.Module):
         # TODO: compute forward pass
         x = self.model(x)
         return x
+
+
+class CNN2(nn.Module):
+
+    def __init__(self, input_channels=None, n_classes=3):
+        super(CNN, self).__init__()
+        # TODO : define layers of a convolutional neural network
+        self.emb_size = 16 * 4 * 4
+
+        layers = [
+            nn.Conv2d(input_channels, 16, kernel_size=3, stride=1, padding=1), # (3, 48, 48) -> (16, 24, 24)
+            nn.BatchNorm2d(16),
+            nn.GELU(),
+            nn.MaxPool2d(2, stride=2),
+            
+            nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(16),
+            nn.GELU(),
+            
+            nn.AdaptiveMaxPool2d((4, 4)),  # (16, 4, 4)
+            nn.Flatten(),
+            
+            nn.Linear(self.emb_size, 128),
+            nn.GELU(),
+            nn.Linear(128, n_classes)
+        ]
+        self.model = nn.Sequential(
+            *layers
+        )
+
+    def forward(self, x):
+        # TODO: compute forward pass
+        x = self.model(x)
+        return x

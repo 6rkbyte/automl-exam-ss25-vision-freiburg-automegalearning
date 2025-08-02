@@ -140,12 +140,13 @@ augments = defaultdict(int) #TODO default dict to make removing stuff easier (wi
 # augments.update({'horflip': 0.1, 'verflip': 0.1})
 #augments.update({'rot': 20, 'horflip': 0.4}) #! cancer
 # augments.update({'rot': 5, 'horflip': 0.4, 'verflip': 0.1, 'blur': 2.0}) #! cancer (try also kernel size 5x5)
-augments.update({'rot': 5, 'horflip': 0.4, 'verflip': 0.1, 'blur': 3.0}) #! cancer (try also kernel size 5x5)
+# augments.update({'rot': 5, 'horflip': 0.4, 'verflip': 0.1, 'blur': 3.0}) #! cancer (try also kernel size 5x5)
 # augments.update({'blur': 2.0}) #! cancer (try also kernel size 5x5)
 #{'rot': 5, 'horflip': 0.4, 'verflip': 0.1, 'blur': 2.0}
 # augments.update({'rot': 20, 'horflip': 0.4, 'elastic':0.1})
 # augments.update({'horflip': 0.20, 'elastic':0.1})
 # augments.update({'affine': 10})
+augments.update({'initial_lr': 0.00408, 'lr_decay': 0.39196, 'dropout': 0.20000})
 
 if not args.quiet:
 	logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
