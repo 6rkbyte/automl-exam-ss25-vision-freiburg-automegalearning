@@ -28,10 +28,10 @@ class Mobilenet(nn.Module):
             self.head = nn.Sequential(
                 nn.AdaptiveAvgPool2d((1, 1)),
                 nn.Flatten(),
-                nn.Linear(head_in, 1024),
+                nn.Linear(head_in, 128),
                 nn.Hardswish(),
                 nn.Dropout(p=0.2),
-                nn.Linear(1024, num_classes)
+                nn.Linear(128, num_classes)
             )
 
 

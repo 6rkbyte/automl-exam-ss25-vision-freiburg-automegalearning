@@ -1,0 +1,60 @@
+Maxim Evolution Strategy: increase search efficiency by splitting search into stages:
+search the type of architecture, then the exact blocks and size of architecture,
+only then LR, augmentation params.
+
+Henry: Hyperband is more stable Successive Halving
+Henry: can you try HPO just for lr for last layer? Currently I use 0.001 to 0.01
+
+Maxim
+- Vit trains 45 min on flowers, test 0.985, loss 0.002, lr 0.001, 20 epochs, batch 512
+- Vit trains 2 hours on emotions, test 0.595, loss 0.57, lr 0.001, 20 epochs, batch 512
+
+
+
+Diogo's Optuna pretrained vs CNN from scratch
+- chooses pretrained for flowers and scratch CNN for emotions
+- TODO compare accuracy on validation part
+
+src/automl/optuna_cancer.py --dataset <D> --epochs <E> --trials <T>
+D: fashion, flowers, emotions
+E: epochs per trial, choose_network() always runs 2 epochs
+T: trials, int
+
+Optionally:
+--resize <new_size> to resize pic
+ignore --replace, --delete - related to psql
+
+Manuall stufff, doesn't have choose_network()
+./run_cancer.py --dataset <> --epochs <> [--resize <>]
+
+
+
+Henry: except accuracy, calculate ROC
+
+Henry: early stopping for final run
+
+=============================================
+Experiments
+=============================================
+
+# fashion DummyNN lr 0.005
+# epoch 20 lr 0.005 loss 0.17 test 0.878
+
+# fashion mobilenet lr 0.005
+# epoch 5 loss 0.577
+# epoch 10 loss 0.387
+# epoch 20 loss 0.273 test 0.70
+
+# fashion large cnn lr 0.003
+# epoch 20 loss 0.07 test 0.91
+
+# fashion vit lr 0.003 4 hours
+# epoch 20 loss 0.16 test 0.91
+
+
+# flowers vit lr 0.001
+# epoch 20 loss 0.002 test 0.985
+
+
+# emotions Vit lr 0.001 2 hours
+# epoch 20 loss 0.57 test 0.60 batch 512

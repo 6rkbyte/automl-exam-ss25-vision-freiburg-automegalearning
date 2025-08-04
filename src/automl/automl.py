@@ -25,7 +25,7 @@ from automl.utils import TrainLog
 
 
 logger = logging.getLogger(__name__)
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda:4" if torch.cuda.is_available() else "cpu"
 #device = "cpu"
 
 
@@ -73,29 +73,12 @@ class AutoML:
 
         #model = DummyNN(input_size, dataset_class.num_classes)
         #model = CNN(dataset_class.channels, dataset_class.num_classes)
-        #model = Mobilenet(dataset_class.channels, dataset_class.num_classes)
-        model = Vit(dataset_class.channels, dataset_class.num_classes)
+        model = Mobilenet(dataset_class.channels, dataset_class.num_classes)
+        #model = Vit(dataset_class.channels, dataset_class.num_classes)
         
         model = model.to(device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.001) # 0.003
-        # 1) mobilenet
-        # lr 0.001 loss 0.93 test 0.67
-        # lr 0.003 same
-
-        # fashion DummyNN lr 0.005
-        # epoch 20 lr 0.005 loss 0.17 test 0.878
-        
-        # fashion mobilenet lr 0.005
-        # epoch 5 loss 0.577
-        # epoch 10 loss 0.387
-        # epoch 20 loss 0.273 test 0.70
-        
-        # fashion cnn lr 0.005
-        # epoch 20 loss 0.130 test 0.89
-        
-        # flowers vit lr 0.001
-        # epoch 20 loss 0.002 test 0.985
+        optimizer = optim.Adam(model.parameters(), lr=0.003) # 0.003
         
         model.train()
         for epoch in range(20):
