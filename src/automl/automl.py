@@ -45,14 +45,18 @@ class AutoML:
         def objective(trial):
             # Sample hyperparameters
             lr = trial.suggest_float("lr", 5e-5, 1e-3, log=True)
-            linear_n_layers = trial.suggest_int("linear_n_layers", 1, 2)
-            conv_n_layers = trial.suggest_int("conv_n_layers", 1, 3)
+            
+            linear_n_layers = trial.suggest_int("linear_n_layers", 1, 4)
+            linear_size_scale = trial.suggest_int("linear_size_scale", 1, 8)
+            #linear_n_layers = trial.suggest_int("linear_n_layers", 1, 2)
+            #conv_n_layers = trial.suggest_int("conv_n_layers", 1, 3)
             #optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
 
             params = {
                 "lr": lr,
                 "linear_n_layers": linear_n_layers,
-                "conv_n_layers": conv_n_layers,
+                #"conv_n_layers": conv_n_layers,
+                "linear_size_scale": linear_size_scale
             }
             for i in range(linear_n_layers):
                 params[f"n_units_l{i}"] = trial.suggest_int(f"n_units_l{i}", 32, 600)
